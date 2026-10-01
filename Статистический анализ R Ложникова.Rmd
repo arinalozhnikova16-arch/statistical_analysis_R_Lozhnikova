@@ -1,0 +1,1276 @@
+---
+title: "Практическое задание. Вариант 9"
+author: "Ложникова Арина Сергеевна БИ-3-24-04"
+date: "2026-07-02"
+output: html_document
+---
+
+```{r Загрузка библиотек}
+library(conflicted)
+library(tidyverse)
+conflicts_prefer(dplyr::filter)
+library(psych)
+conflicts_prefer(ggplot2::alpha)
+```
+## Задача 1
+Для 100 элементов из заданной статистической совокупности:
+  1. составить интервальный вариационный ряд (предварительно сделать очистку данных с помощью построения графика BoxPlot). Аргументировать выбранное число интервалов при построении интервального вариационного ряда;
+  2. вычислить относительные частоты; вычислить значения эмпирической функции распределения;
+  3. построить графики (гистограммы) относительных частот и эмпирической функции распределения;
+  4. вычислить выборочные: среднее значение, дисперсию, среднеквадратическое отклонение и определить выборочные моду и медиану, коэффициенты асимметрии, эксцесса, вариации, децильный и квартильный коэффициенты вариации; сделать вывод;
+  5. вычислить точечные и интервальные оценки генеральной средней, генеральной дисперсии и среднеквадратического отклонения с доверительной вероятностью  0,95. Построить графики плотности с доверительными интервалами;
+  6. найти необходимый объем выборки для определения генерального среднего с предельной ошибкой 0,8 с доверительной вероятностью 0,95;
+  7. проверить гипотезу о том, что генеральная совокупность имеет нормальное распределение на уровне значимости 0,05;привести график критической области;
+  8. проверить гипотезу о том, что генеральная совокупность имеет равномерное распределение на уровне значимости 0,03; привести график критической области;
+  9. проверить гипотезу о том, что генеральная совокупность имеет показательное распределение на уровне значимости 0,02; привести график критической области.
+
+### Загрузка данных
+```{r Загрузка данных для задания 1}
+data <- c(9.52, 11.64, 4.20, 2.20, 3.74, 3.35, 8.77, 6.50, 4.41, 2.87,
+          2.37, 10.92, 5.59, 8.90, 10.97, 3.09, 4.00, 2.44, 3.75, 6.13,
+          9.68, 2.55, 7.90, 4.72, 2.58, 4.96, 10.30, 5.59, 5.48, 12.43,
+          8.82, 2.76, 4.41, 4.47, 10.90, 10.06, 9.00, 5.83, 6.30, 11.74,
+          5.25, 11.11, 7.90, 1.85, 6.79, 2.81, 0.24, 11.44, 2.24, -1.73,
+          7.34, 1.33, 10.03, 9.33, 8.97, 8.19, 10.99, 6.77, 2.49, 9.99,
+          4.79, 10.01, 6.24, 9.22, 9.21, 3.76, 5.71, 5.97, 8.06, 6.67,
+          23.35, 2.26, 8.23, 6.60, 4.58, 1.33, 12.17, 7.08, 10.75, 10.49,
+          8.43, 3.58, 8.66, 5.36, 3.48, 7.83, 12.25, 2.13, 8.28, 10.37,
+          2.15, 8.09, 8.51, 2.70, 10.87, 1.36, 6.04, 6.66, 4.00, 4.31)
+cat("Первоначальынй разер выборки: ", length(data), "\n")
+```
+
+### Проверка наличия выбросов с помощью BoxPlot
+```{r Проверка наличия выбросов с помощью BoxPlot}
+df <- data.frame(data)
+
+ggplot(df, aes(y = data)) + 
+  geom_boxplot(fill = "lightblue", alpha = 0.7) +
+  labs(title = "BoxPlot для очистки данных", y = "Значения") +
+  theme_minimal()
+```
+
+### Очистка данных через межквартальный размах
+Данные содержат выброс, поэтому перед проведением статистического анализа необходимо очистить их. Избавить от выброса можно через вычисление межквартального размаха. 
+```{r Очистка данных через межквартальный размах}
+# Есть выброс => делаем очистку с помощью межквартального размаха
+Q1 <- quantile(data, 0.25)
+Q3 <- quantile(data, 0.75)
+IQR <- Q3 - Q1
+
+lower <- Q1 - 1.5 * IQR
+upper <- Q3 + 1.5 * IQR
+
+delete <- data[data < lower | data > upper]
+cat("Выбросы: ", delete, "\n")
+
+data <- data[data >= lower & data <= upper]
+df <- data.frame(data)
+
+cat("Данные после очистки: ", data, "\n")
+cat("Размер выборки после очистки данных: ", length(data), "\n")
+
+```
+
+### Построение интервального вариационного ряда
+```{r Построение интервального вариационного ряда}
+# Количество интервалов по формуле Стёрджесса
+n <- length(data)
+k <- floor(1 + log2(n)) # окгругление "до пола", т.е. берём только целую часть числа
+cat("Число интервалов по Стерджессу: k = ", k, "\n")
+
+# Размах
+R <- max(data) - min(data)
+# Ширина интервала
+h <- R / k
+cat("Ширина интервала (h):", round(h, 3), "\n")
+
+# Границы интервалов
+I <- seq(min(data), max(data), by = h)
+
+# Вариационный ряд
+hist_data <- hist(data, breaks = I, plot = FALSE)
+intervals <- data.frame(
+  Интервал = paste0("[", round(hist_data$breaks[-length(hist_data$breaks)], 2), 
+                    "; ", round(hist_data$breaks[-1], 2), ")"),
+  Частота = hist_data$counts
+)
+intervals
+```
+
+### Нахождение относительных частот и значений эмпирической функции распределения
+```{r Относительные частоты и эмпирическая функция распределения}
+# Относительные частоты
+CO <- intervals$Частота / n
+
+# Плотность относительной частоты
+CO_h <- CO / h
+
+# Эмпирическая функция рас-ия
+F_x <- cumsum(CO)
+
+intervals$Относительная_частота <- round(CO, 4)
+intervals$Плотность_относительной_частоты <- round(CO_h, 4)
+intervals$Накопленная_частота <- round(F_x, 4)
+
+intervals
+```
+
+### Гистограмма относительных частот
+```{r Гистограмма относительных частот}
+ggplot(df, aes(x = data)) +
+  geom_histogram(aes(y = after_stat(CO_h)), bins = k, # скрипт считает относ.частоту сам
+                 fill = "lightblue", color = "darkblue", alpha = 0.7, linewidth = 0.6) +
+  geom_density(color = "darkgreen", size = 1.3) +
+  geom_vline(xintercept = mean(data), color = "red", linetype = "dashed", size = 1.3) +
+  geom_vline(xintercept = median(data), color = "orange", linetype = "dashed", size = 1.3) +
+  annotate("label", x = 8.5, y = 0.10,
+           label = paste("Среднее =", round(mean(data), 1)), color = "red") +
+  annotate("label", x = 8.5, y = 0.11,
+           label = paste("Медиана =", round(median(data), 1)), color = "orange") +
+  annotate("label", x = -1, y = 0.06,
+           label = "Плотность\nраспределения", color = "darkgreen") +
+  labs(title = "Гистограмма относительных частот",
+     x = "Значения",
+     y = "Плотность относительной частоты") +
+  theme_minimal()
+```
+
+### График эмпирической функции распределения
+```{r Эмпирическая функция распределения}
+
+x_points <- hist_data$breaks 
+y_points <- c(0, F_x)
+
+df_points <- data.frame(x = x_points, y = y_points)
+
+x_F <- seq(min(x_points), max(x_points), length.out = 500)
+y_F <- spline(x_points, y_points, xout = x_F)$y
+
+df_F <- data.frame(x = x_F, y = y_F)
+
+ggplot() +
+  geom_line(data = df_F, aes(x = x, y = y), color = "darkblue", size = 1.3) +
+  geom_point(data = df_points, aes(x = x, y = y),
+             shape = 21, size = 4, fill = "lightblue", color = "darkblue", stroke = 2) +
+  labs(title = "Эмпирическая функция распределения",
+       x = "Значения",
+       y = expression("F*(x)")) +
+  theme_minimal()
+```
+
+### Вычисление выборочных характеристик
+```{r Выборочные характеристики}
+
+# Размер выборки
+n <- length(data)
+
+# Среднее значение
+mean <- mean(data)
+cat("Среднее значение:", round(mean, 4), "\n")
+
+# Несмещённая дисперсия
+D <- var(data)
+# Смещённая дисперсия
+D_n <- var(data) * (n - 1) / n
+cat("Дисперсия (смещённая):", round(D_n, 4), "\n")
+cat("Дисперсия (несмещённая):", round(D, 4), "\n")
+
+# Среднеквадратическое отклонение (несмещённое)
+sd <- sd(data)
+# Среднеквадратическое отклонение (смещённое)
+sd_n <- sqrt(D_n)
+cat("Среднеквадратическое отклонение (смещённое):", round(sd_n, 4), "\n")
+cat("Среднеквадратическое отклонение (несмещённое):", round(sd, 4), "\n")
+
+# Мода
+get_mode <- function(x) {
+  table <- table(data)
+  as.numeric(names(table)[which.max(table)])
+}
+Mo <- get_mode(data)
+cat("Мода:", round(Mo, 4), "\n")
+
+# Медиана
+Me <- median(data)
+cat("Медиана:", round(Me, 4), "\n")
+
+# Коэффициент асимметрии
+As <- skew(data)
+cat("Коэффициент асимметрии:", round(As, 4), "\n")
+
+# Коэффициент эксцесса
+Ex <- kurtosi(data)
+cat("Коэффициент эксцесса:", round(Ex, 4), "\n")
+
+# Коэффициент вариации
+V <- (sd_n / mean)
+cat("Коэффициент вариации:", round(V, 2), "\n")
+
+# Квартили
+Q1 <- quantile(data, 0.25)
+Q2 <- quantile(data, 0.50)
+Q3 <- quantile(data, 0.75)
+
+# Децили
+D1 <- quantile(data, 0.10)
+D9 <- quantile(data, 0.90)
+
+# Квартильный коэффициент вариации
+K_Q <- (Q3 - Q1) / (2 * Me)
+cat("Квартильный коэффициент вариации:", round(K_Q, 4), "\n")
+
+# Децильный коэффициент вариации
+K_D <- D9 / D1
+cat("Децильный коэффициент вариации:", round(K_D, 4), "\n")
+
+```
+Выборка однородна по центру, так как среднее  и медиана практически равны, а асимметрия достаточно слабая. Однако присутствует сильный разброс: коэффициент вариации 51%, и распределение плосковершинное по эксцессу. При этом крайние значения сильно отличаются от центра (децильный коэффициент 4.83).
+
+### Нахождение точечных и интервальных оценок
+```{r Точечные и интервальные оценки}
+
+alpha <- 1 - 0.95
+
+# Точечные оценки
+point_mean <- mean
+point_var <- D
+point_sd <- sd
+
+cat("Точечная оценка генеральной средней:", round(point_mean, 4), "\n")
+cat("Точечная оценка генеральной дисперсии:", round(point_var, 4), "\n")
+cat("Точечная оценка СКО:", round(point_sd, 4), "\n")
+
+# Интервальные оценки
+
+# Среднее
+t <- qt(1 - alpha/2, n - 1)
+delta <- t * sd / sqrt(n)
+mean_lower <- mean - delta
+mean_upper <- mean + delta
+
+cat("Доверительный интервал для генеральной средней:\n")
+cat("[", round(mean_lower, 4), "; ", round(mean_upper, 4), "]\n")
+
+# Дисперсия
+chi2_1 <- qchisq(alpha/2, n - 1)
+chi2_2 <- qchisq(1 - alpha/2, n - 1)
+D_upper <- (n - 1) * D / chi2_1
+D_lower <- (n - 1) * D / chi2_2
+
+cat("Доверительный интервал для генеральной дисперсии:\n")
+cat("[", round(D_lower, 4), "; ", round(D_upper, 4), "]\n")
+
+# СКО
+sd_upper <- sqrt(D_upper)
+sd_lower <- sqrt(D_lower)
+
+cat("Доверительный интервал для генерального СКО:\n")
+cat("[", round(sd_lower, 4), "; ", round(sd_upper, 4), "]\n")
+```
+
+### График доверительного интервала для генеральной средней
+```{r Графики ДИ для среднего}
+x_mean <- seq(mean - 4 * sd / sqrt(n), mean + 4 * sd / sqrt(n), length.out =1000)
+y_mean <- dnorm(x_mean, mean = mean, sd = sd / sqrt(n))
+
+df_mean <- data.frame(x = x_mean, y = y_mean)
+
+df_mean_fill <- df_mean[df_mean$x >= mean_lower & df_mean$x <= mean_upper, ]
+
+ggplot() +
+  geom_line(data = df_mean, aes(x = x, y = y), color = "darkblue", size = 1) +
+  geom_area(data = df_mean_fill, aes(x = x, y = y), fill = "lightblue", alpha = 0.7) +
+  geom_vline(xintercept = mean, color = "darkgreen", size = 1, linetype = "dotdash") +
+  geom_vline(xintercept = mean_lower, color = "darkred", size = 1, linetype = "dashed") +
+  geom_vline(xintercept = mean_upper, color = "darkred", size = 1, linetype = "dashed") +
+  annotate("label", x = mean, y = -0.05,
+           label = round(mean, 4), color = "darkgreen") +
+  annotate("label", x = mean_lower, y = -0.05, 
+           label = round(mean_lower, 4), color = "darkred") +
+  annotate("label", x = mean_upper, y = -0.05, 
+           label = round(mean_upper, 4), color = "darkred") +
+  labs(title = "Доверительный интервал для генеральной средней (95%)",
+       x = "Значения",
+       y = "Плотность вероятности") +
+  theme_minimal()
+```
+
+### График доверительного интервала для генеральной длисперсии
+```{r Графики ДИ для дисперсии}
+df_df <- n - 1
+help <- seq(qchisq(0.001, df_df), qchisq(0.999, df_df), length.out = 1000)
+x_D <- (df_df * D) / help
+y_D <- dchisq(help, df_df)
+
+df_D <- data.frame(x = x_D, y = y_D)
+
+df_D_fill <- df_D[df_D$x >= D_lower & df_D$x <= D_upper, ]
+
+ggplot() +
+  geom_line(data = df_D, aes(x = x, y = y), color = "darkblue", size = 1) +
+  geom_area(data = df_D_fill, aes(x = x, y = y), fill = "lightblue", alpha = 0.7) +
+  geom_vline(xintercept = D, color = "darkgreen", linetype = "dotdash", size = 1) +
+  geom_vline(xintercept = D_lower, color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = D_upper, color = "darkred", linetype = "dashed", size = 1) +
+  annotate("label", x = D, y = -0.0002,
+           label = round(D, 4), color = "darkgreen") +
+  annotate("label", x = D_lower, y = -0.0002, 
+           label = round(D_lower, 4), color = "darkred") +
+  annotate("label", x = D_upper, y = -0.0002, 
+           label = round(D_upper, 4), color = "darkred") +
+  labs(title = "Доверительный интервал для генеральной дисперсии (95%)",
+       x = "Значения",
+       y = "Плотность вероятности") +
+  theme_minimal()
+
+```
+
+### График доверительного интервала для генерального СКО
+```{r Графики ДИ для СКО}
+x_sd <- sqrt(x_D)
+y_sd <- y_D
+df_sd <- data.frame(x = x_sd, y = y_sd)
+
+df_sd_fill <- df_sd[df_sd$x >= sd_lower & df_sd$x <= sd_upper, ]
+
+ggplot() +
+  geom_line(data = df_sd, aes(x = x, y = y), color = "darkblue", size = 1) +
+  geom_area(data = df_sd_fill, aes(x = x, y = y), fill = "lightblue", alpha = 0.7) +
+  geom_vline(xintercept = sd, color = "darkgreen", linetype = "dotdash", size = 1) +
+  geom_vline(xintercept = sd_lower, color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = sd_upper, color = "darkred", linetype = "dashed", size = 1) +
+  annotate("label", x = sd, y = -0.001,
+           label = round(sd, 4), color = "darkgreen") +
+  annotate("label", x = sd_lower, y = -0.001, 
+           label = round(sd_lower, 4), color = "darkred") +
+  annotate("label", x = sd_upper, y = -0.001, 
+           label = round(sd_upper, 4), color = "darkred") +
+  labs(title = "Доверительный интервал для генерального СКО (95%)",
+       x = "Значения",
+       y = "Плотность вероятности") +
+  theme_minimal()
+```
+
+### Вычисление необходимого объёма выборки
+```{r Нахождение необходимого объёма выборки}
+
+delta <- 0.8
+alpha <- 1 - 0.95
+
+z <- qnorm(1 - alpha/2)
+
+n_find <- (z^2 * sd^2) / (delta^2)
+
+cat("Итог по формуле:", n_find, "\n")
+
+# Округляем вверх до целого 
+n_find <- ceiling(n_find)
+
+cat("Необходимый объем выборки:", n_find, "\n")
+```
+
+### Подготовка интервалов перед проверкой на вид распределения
+Перед проверкой гипотез на вид рас-ия возможно необходимо объединить интервалы. В каждом интервале должно быть не мнее 5 значений => объединяем 1 и 2 интервалы
+```{r Подготовка интервалов перед проверкой на рас-ия}
+
+# Перед проверкой гипотез на вид рас-ия возможно необходимо объединить интервалы
+# В каждом интервале должно быть не мнее 5 значений => объединяем 1 и 2 интервалы
+breaks <- c(hist_data$breaks[1], hist_data$breaks[3:length(hist_data$breaks)])
+
+n_i <- c(sum(hist_data$counts[1:2]), hist_data$counts[3:length(hist_data$counts)])
+
+cat("Новое число интервалов k:", length(n_i), "\n")
+
+```
+
+### Проверка гипотезы о том, про генеральная совокупность имеет нормальное распределение
+```{r Проверка гипотезы о нормальном распределении}
+
+alpha <- 0.05
+df_n <- length(n_i) - 2 - 1 
+breaks_norm <- c(-10000000, breaks[2:6], 10000000)
+
+p_i <- diff(pnorm(breaks_norm, mean, sd))
+chi2_nabl <- chisq.test(n_i, p = p_i)
+chi2_nabl <- chi2_nabl$statistic
+
+chi2_crit <- qchisq(1 - alpha, df_n)
+
+cat("H0: Генеральная совокупность имеет нормальное распределение\n")
+cat("H1: Генеральная совокупность не имеет нормальное распределение\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значение X^2_набл:", round(chi2_nabl, 4), "\n")
+cat("Критическое значение X^2_крит:", round(chi2_crit, 4), "\n")
+
+if (chi2_nabl > chi2_crit) {
+  cat("X^2_набл > X^2_крит => H0 отвергается\n")
+} else {
+  cat("X^2_набл < X^2_крит => H0 не отвергается\n")
+}
+
+x_chi <- seq(0, 15, length.out = 500)
+y_chi <- dchisq(x_chi, df = df_n)
+df_chi <- data.frame(x = x_chi, y = y_chi)
+
+df_chi_fill <- df_chi[df_chi$x >= chi2_crit, ]
+
+ggplot() +
+  geom_area(data = df_chi_fill, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_chi, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = chi2_crit,
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = chi2_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = chi2_crit, y = 0.15,
+           label = paste("x^2(крит) =", round(chi2_crit, 3)), color = "darkred") +
+  annotate("label", x = chi2_nabl, y = 0.18,
+           label = paste("x^2(набл) =", round(chi2_nabl, 3)), color = "darkgreen") +
+  labs(title = "Проверка гипотезы на нормальное распределение",
+       subtitle = "x^2-распределение | Уровень значимости 0,05",,
+       x = "x^2-статистика", y = "Плотность") +
+  theme_minimal()
+
+```
+
+### Проверка гипотезы о том, про генеральная совокупность имеет равномерное распределение
+```{r Проверка гипотезы о равномерном распределении}
+
+alpha <- 0.03
+df_n <- length(n_i) - 2 - 1 
+a <- mean - sqrt(3) * sd
+b <- mean + sqrt(3) * sd
+breaks_ravn <- c(a, breaks[2:6], b)
+
+p_i <- diff(punif(breaks_ravn, a, b))
+chi2_nabl <- chisq.test(n_i, p = p_i)
+chi2_nabl <- chi2_nabl$statistic
+
+chi2_crit <- qchisq(1 - alpha, df_n)
+
+cat("H0: Генеральная совокупность имеет равномерное распределение\n")
+cat("H1: Генеральная совокупность не имеет равномерное распределение\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значение X^2_набл:", round(chi2_nabl, 4), "\n")
+cat("Критическое значение X^2_крит:", round(chi2_crit, 4), "\n")
+
+if (chi2_nabl > chi2_crit) {
+  cat("X^2_набл > X^2_крит => H0 отвергается\n")
+} else {
+  cat("X^2_набл < X^2_крит => H0 не отвергается\n")
+}
+
+x_chi <- seq(0, 20, length.out = 500)
+y_chi <- dchisq(x_chi, df = df_n)
+df_chi <- data.frame(x = x_chi, y = y_chi)
+
+df_chi_fill <- df_chi[df_chi$x >= chi2_crit, ]
+
+ggplot() +
+  geom_area(data = df_chi_fill, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_chi, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = chi2_crit,
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = chi2_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = chi2_crit, y = 0.08,
+           label = paste("x^2(крит) =", round(chi2_crit, 3)), color = "darkred") +
+  annotate("label", x = chi2_nabl, y = 0.10,
+           label = paste("x^2(набл) =", round(chi2_nabl, 3)), color = "darkgreen") +
+  labs(title = "Проверка гипотезы на равномрное распределение",
+       subtitle = "x^2-распределение | Уровень значимости 0,03",,
+       x = "x^2-статистика", y = "Плотность") +
+  theme_minimal()
+
+
+```
+
+### Проверка гипотезы о том, про генеральная совокупность имеет показательное распределение
+```{r Проверка гипотезы о показательном распределении}
+
+alpha <- 0.02
+df_n <- length(n_i) - 1 - 1 
+breaks_exp <- c(0, breaks[2:6], 10000000)
+
+p_i <- diff(pexp(breaks_exp, rate = 1 / mean))
+chi2_nabl <- chisq.test(n_i, p = p_i)
+chi2_nabl <- chi2_nabl$statistic
+
+chi2_crit <- qchisq(1 - alpha, df_n)
+
+cat("H0: Генеральная совокупность имеет показательное распределение\n")
+cat("H1: Генеральная совокупность не имеет показательное распределение\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значение X^2_набл:", round(chi2_nabl, 4), "\n")
+cat("Критическое значение X^2_крит:", round(chi2_crit, 4), "\n")
+
+if (chi2_nabl > chi2_crit) {
+  cat("X^2_набл > X^2_крит => H0 отвергается\n")
+} else {
+  cat("X^2_набл < X^2_крит => H0 не отвергается\n")
+}
+
+x_chi <- seq(0, 50, length.out = 500)
+y_chi <- dchisq(x_chi, df = df_n)
+df_chi <- data.frame(x = x_chi, y = y_chi)
+
+df_chi_fill <- df_chi[df_chi$x >= chi2_crit, ]
+
+ggplot() +
+  geom_area(data = df_chi_fill, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_chi, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = chi2_crit,
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = chi2_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = chi2_crit, y = 0.15,
+           label = paste("x^2(крит) =", round(chi2_crit, 3)), color = "darkred") +
+  annotate("label", x = chi2_nabl, y = 0.15,
+           label = paste("x^2(набл) =", round(chi2_nabl, 3)), color = "darkgreen") +
+  labs(title = "Проверка гипотезы на показательное распределение",
+       subtitle = "x^2-распределение | Уровень значимости 0,02",,
+       x = "x^2-статистика", y = "Плотность") +
+  theme_minimal()
+
+
+```
+
+## Задача 2
+Считая, что первые 25 элементов из статистической совокупности образуют выборку А из генеральной совокупности X, а последние 20 элементов образуют выборку Б из генеральной совокупности Y проверить гипотезы о том, что
+ 1. генеральное среднее X равно m на уровне значимости 0,02, считая, что генеральная дисперсия известна и равна d;
+ 2. генеральное среднее Y равно m на уровне значимости 0,05, считая, что генеральная дисперсия неизвестна;
+ 3. генеральное среднее X равно генеральной средней Y на уровне значимости 0,05;
+ 4. генеральная дисперсия X равна d на уровне значимости 0,05;
+ 5. генеральная дисперсия X равна генеральной дисперсии выборки Б на уровне значимости 0,01. Во всех пунктах привести график критической области.
+
+### Загрузка данных
+```{r Загрузка данных для задания 2}
+# Выборка А
+A <- c(9.52, 11.64, 4.20, 2.20, 3.74, 3.35, 8.77, 6.50, 4.41, 2.87,
+       2.37, 10.92, 5.59, 8.90, 10.97, 3.09, 4.00, 2.44, 3.75, 6.13,
+       9.68, 2.55, 7.90, 4.72, 2.58)
+
+# Выборка Б
+B <- c(8.43, 3.58, 8.66, 5.36, 3.48, 7.83, 12.25, 2.13, 8.28, 10.37,
+       2.15, 8.09, 8.51, 2.70, 10.87, 1.36, 6.04, 6.66, 4.00, 4.31)
+
+m <- 6
+d <- 11
+```
+
+### Вычисление всех необходимых статистик
+```{r Нахождение всех необходимых статистик}
+# Объёмы выборок
+n_A <- length(A)
+n_B <- length(B)
+
+# Средние значения
+mean_A <- mean(A)
+mean_B <- mean(B)
+
+# Дисперсии
+D_A <- var(A)
+D_B <- var(B)
+
+# СКО
+sd_A <- sd(A)
+sd_B <- sd(B)
+
+cat("ВЫБОРКА А\n")
+cat("Объём выборки:", n_A, "\n")
+cat("Среднее значение:", round(mean_A, 4), "\n")
+cat("Дисперсия:", round(D_A, 4), "\n")
+cat("СКО:", round(sd_A, 4), "\n\n")
+
+cat("ВЫБОРКА Б\n")
+cat("Объём выборки:", n_B, "\n")
+cat("Среднее значение:", round(mean_B, 4), "\n")
+cat("Дисперсия:", round(D_B, 4), "\n")
+cat("СКО:", round(sd_B, 4), "\n")
+```
+
+### Проверка гипотезы о равенстве среднего нормативу при известной генеральной дисперсии
+```{r Проверка гипотезы о равенстве среднего нормативу (дисп известна)}
+
+alpha <- 0.02
+
+z_nabl <- (mean_A - m) / sqrt(d) * sqrt(n_A)
+
+z_crit <- qnorm(1 - alpha/2)
+
+cat("H0: Среднее выборки A равно", m, "\n")
+cat("H1: Среднее выборки A не равно", m, "\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значеие Z_набл:", round(z_nabl, 4), "\n")
+cat("Критические значение Z_крит: +/-", round(z_crit, 4), "\n")
+
+if (abs(z_nabl) > z_crit) {
+  cat("|Z_набл| > Z_крит => H0 отвергается\n")
+} else {
+  cat("|Z_набл| < Z_крит => H0 не отвергается\n")
+}
+
+x_z <- seq(-4, 4, length.out = 1000)
+y_z <- dnorm(x_z, mean = 0, sd = 1)
+df_z <- data.frame(x = x_z, y = y_z)
+
+df_z_fill_1 <- df_z[df_z$x <= -z_crit, ]
+df_z_fill_2 <- df_z[df_z$x >= z_crit, ]
+
+ggplot() +
+  geom_area(data = df_z_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_z_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_z, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(-z_crit, z_crit),
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = z_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = -z_crit, y = -0.02,
+           label = paste("Z(крит) =", round(-z_crit, 3)), color = "darkred") +
+  annotate("label", x = z_crit, y = -0.02,
+           label = paste("Z(крит) =", round(z_crit, 3)), color = "darkred") +
+  annotate("label", x = z_nabl, y = -0.02,
+           label = paste("Z(набл) =", round(z_nabl, 3)), color = "darkgreen") +
+  labs(title = "График критической области для задания 2.1)",
+       subtitle = "z-распределение | Уровень значимости 0,02",,
+       x = "z-статистика", y = "Плотность") +
+  theme_minimal()
+
+```
+
+### Проверка гипотезы о равенстве среднего нормативу при неизвестной генеральной дисперсии
+```{r Проверка гипотезы о равенстве среднего нормативу (дисп неизвестна)}
+
+alpha <- 0.05
+
+t_nabl <- (mean_B - m) / sd_B * sqrt(n_B)
+
+t_crit <- qt(1 - alpha/2, n_B - 1)
+
+cat("H0: Среднее выборки Б равно", m, "\n")
+cat("H1: Среднее выборки Б не равно", m, "\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значение T_набл:", round(t_nabl, 4), "\n")
+cat("Критическое значение t_крит: +/-", round(t_crit, 4), "\n")
+
+if (abs(t_nabl) > t_crit) {
+  cat("|T_набл| > t_крит => H0 отвергается\n")
+} else {
+  cat("|T_набл| < t_крит => H0 не отвергается\n")
+}
+
+df_B <- n_B - 1
+x_t <- seq(-4, 4, length.out = 1000)
+y_t <- dt(x_t, df = df_B)
+df_t <- data.frame(x = x_t, y = y_t)
+
+df_t_fill_1 <- df_t[df_t$x <= -t_crit, ]
+df_t_fill_2 <- df_t[df_t$x >= t_crit, ]
+
+ggplot() +
+  geom_area(data = df_t_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_t_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+    geom_line(data = df_t, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(-t_crit, t_crit),
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = t_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = -t_crit, y = -0.02,
+           label = paste("t1(крит) =", round(-t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_crit, y = -0.02,
+           label = paste("t2(крит) =", round(t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_nabl, y = -0.02,
+           label = paste("T(набл) =", round(t_nabl, 3)), color = "darkgreen") +
+  labs(title = "График критической области для задания 2.2",
+       subtitle = "t-распределение | Уровень значимости 0,05",,
+       x = "t-статистика", y = "Плотность") +
+  theme_minimal()
+
+```
+
+### Проверка гипотезы о равенстве среднего значений двух выборок
+```{r Проверка гипотезы о равенстве средних значений двух выборок}
+
+alpha <- 0.05
+
+t_nabl <- (mean_A - mean_B) / sqrt((n_A - 1) * D_A + (n_B - 1) * D_B) * sqrt((n_A * n_B * (n_A + n_B - 2))/(n_A + n_B))
+
+t_crit <- qt(1 - alpha/2, n_A + n_B - 2)
+
+cat("H0: Среднее выборки А равно среднему выборки Б \n")
+cat("H1: Среднее выборки А не равно среднему выборки Б \n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значение T_набл:", round(t_nabl, 4), "\n")
+cat("Критическое значение t_крит: +/-", round(t_crit, 4), "\n")
+
+if (abs(t_nabl) > t_crit) {
+  cat("|T_набл| > t_крит => H0 отвергается\n")
+} else {
+  cat("|T_набл| < t_крит => H0 не отвергается\n")
+}
+
+df_AB <- n_A + n_B - 2
+x_t <- seq(-4, 4, length.out = 1000)
+y_t <- dt(x_t, df = df_AB)
+df_t <- data.frame(x = x_t, y = y_t)
+
+df_t_fill_1 <- df_t[df_t$x <= -t_crit, ]
+df_t_fill_2 <- df_t[df_t$x >= t_crit, ]
+
+ggplot() +
+  geom_area(data = df_t_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_t_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+    geom_line(data = df_t, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(-t_crit, t_crit),
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = t_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = -t_crit, y = -0.02,
+           label = paste("t1(крит) =", round(-t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_crit, y = -0.02,
+           label = paste("t2(крит) =", round(t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_nabl, y = 0.02,
+           label = paste("T(набл) =", round(t_nabl, 3)), color = "darkgreen") +
+  labs(title = "График критической области для задания 2.3",
+       subtitle = "t-распределение | Уровень значимости 0,05",,
+       x = "t-статистика", y = "Плотность") +
+  theme_minimal()
+
+```
+
+### Проверка гипотезы о равенстве дисперсии нормативу
+```{r Проверка гипотезы о равенстве дисперсии нормативу}
+
+alpha <- 0.05
+
+chi2_nabl <- D_A * (n_A - 1) / d
+
+chi2_crit_1 <- qchisq(alpha/2, n_A - 1)
+chi2_crit_2 <- qchisq(1 - alpha/2, n_A - 1)
+
+cat("H0: Дисперсия выборки А равна", d, "\n")
+cat("H1: Дисперсия выборки А не равна", d, "\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значение X^2_набл:", round(chi2_nabl, 4), "\n")
+cat("Критическое значение X^2_крит_1:", round(chi2_crit_1, 4), "\n")
+cat("Критическое значение X^2_крит_2:", round(chi2_crit_2, 4), "\n")
+
+if (chi2_nabl < chi2_crit_1 || chi2_nabl > chi2_crit_2) {
+  cat("X^2_набл < X^2_крит_1 или X^2_набл > X^2_крит_2 => H0 отвергается\n")
+} else {
+  cat("X^2_крит_1 < X^2_набл < X^2_крит_2 => H0 не отвергается\n")
+}
+
+df_df <- n_A - 1
+x_chi <- seq(0, 60, length.out = 1000)
+y_chi <- dchisq(x_chi, df = df_df)
+df_chi <- data.frame(x = x_chi, y = y_chi)
+
+df_chi_fill_1 <- df_chi[df_chi$x <= chi2_crit_1, ]
+df_chi_fill_2 <- df_chi[df_chi$x >= chi2_crit_2, ]
+
+ggplot() +
+  geom_area(data = df_chi_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_chi_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_chi, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(chi2_crit_1, chi2_crit_2),
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = chi2_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = chi2_crit_1, y = -0.003,
+           label = paste("x^2_1(крит) =", round(chi2_crit_1, 3)), color = "darkred") +
+  annotate("label", x = chi2_crit_2, y = -0.003,
+           label = paste("x^2_2(крит) =", round(chi2_crit_2, 3)), color = "darkred") +
+  annotate("label", x = chi2_nabl, y = 0.003,
+           label = paste("x^2(набл) =", round(chi2_nabl, 3)), color = "darkgreen") +
+  labs(title = "График критической области для задания 2.4",
+       subtitle = "x^2-распределение | Уровень значимости 0,05",,
+       x = "x^2-статистика", y = "Плотность") +
+  theme_minimal()
+
+```
+
+### Проверка гипотезы о равенстве дисперсий двух выборок
+```{r Проверка гипотезы о равенстве дисперсий двух выборок}
+
+alpha <- 0.01
+
+F_nabl <- D_B / D_A
+
+F_crit_1 <- qf(alpha/2, n_B - 1, n_A - 1)
+F_crit_2 <- qf(1 - alpha/2, n_B - 1, n_A - 1)
+
+cat("H0: Дисперсия выборки А равна дисперсии выборки Б \n")
+cat("H1: Дисперсия выборки А не равна дисперсии выборки Б \n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("Наблюдаемое значение F_набл:", round(F_nabl, 4), "\n")
+cat("Критическое значение F_крит_1:", round(F_crit_1, 4), "\n")
+cat("Критическое значение F_крит_2:", round(F_crit_2, 4), "\n")
+
+if (F_nabl < F_crit_1 || F_nabl > F_crit_2) {
+  cat("F_набл < F_крит_1 или F_набл > F_крит_2 => H0 отвергается\n")
+} else {
+  cat("F_крит_1 < F_набл < F_крит_2 => H0 не отвергается\n")
+}
+
+df1_F <- n_B - 1
+df2_F <- n_A - 1
+x_F <- seq(0, 5, length.out = 1000)
+y_F <- df(x_F, df1 = df1_F, df2 = df2_F)
+df_F <- data.frame(x = x_F, y = y_F)
+
+df_F_fill_1 <- df_F[df_F$x <= F_crit_1, ]
+df_F_fill_2 <- df_F[df_F$x >= F_crit_2, ]
+
+ggplot() +
+  geom_area(data = df_F_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_F_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_F, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(F_crit_1, F_crit_2),
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = F_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = F_crit_1, y = -0.05,
+           label = paste("F1(крит) =", round(F_crit_1, 3)), color = "darkred") +
+  annotate("label", x = F_crit_2, y = -0.05,
+           label = paste("F2(крит) =", round(F_crit_2, 3)), color = "darkred") +
+  annotate("label", x = F_nabl, y = 0.05,
+           label = paste("F(набл) =", round(F_nabl, 3)), color = "darkgreen") +
+  labs(title = "График критической области для задания 2.5",
+       subtitle = "F-распределение | Уровень значимости 0,01",,
+       x = "F-статистика", y = "Плотность") +
+  theme_minimal()
+
+```
+
+## Задача 3
+Построить линии регрессии с помощью метода натянутой нити и метода наименьших квадратов для связанных выборок XY, XZ и YZ. Проверить гипотезу о значимости коэффициента корреляции. Сделать прогноз для значения x на 4 единицы больше максимального значения. Построить графики.
+
+### Загрузка данных
+```{r Загрузка данных для задания 3}
+x <- c(3.67, 5.94, 3.80, 5.40, 1.45, 5.45, 2.13, 0.30, 4.29, 6.00,
+       2.11, 2.96, 1.35, 2.63, 0.37, 2.90, 0.51, 1.83, 3.10, 5.58,
+       4.73, 3.10, 3.79, 5.52, 3.21, 0.28, 1.18, 3.09)
+
+y <- c(1.77, 0.28, 1.78, 0.95, 0.46, 1.00, 1.89, 0.20, 0.63, 1.58,
+       0.80, 1.98, 0.83, 1.81, 1.88, 0.51, 0.55, 1.87, 1.22, 0.83,
+       1.40, 1.10, 0.41, 1.96, 1.42, 1.65, 0.12, 0.59)
+
+z <- c(2.14, 1.46, 2.15, 4.88, 3.62, 4.36, 3.91, 2.32, 3.08, 0.92,
+       1.22, 2.77, 4.55, 0.25, 0.98, 3.39, 3.47, 1.47, 1.24, 4.85,
+       0.23, 3.46, 3.98, 4.23, 2.60, 1.91, 3.16, 1.05)
+```
+
+### Вычисление необходимых статистик
+```{r Нахождение статистик}
+
+# Ковариации
+K_xy <- cov(x, y)
+K_xz <- cov(x, z)
+K_yz <- cov(y, z)
+
+# Коэфиициенты корреляции
+r_xy <- cor(x, y)
+r_xz <- cor(x, z)
+r_yz <- cor(y, z)
+
+```
+
+## Набор XY
+### Построение линии регрессии с помощью метода натянутой нити
+```{r XY. Метод натянутой нити}
+
+n <- length(x)
+
+# Индексы min и max по X
+index_min <- which.min(x)
+index_max <- which.max(x)
+
+# Крайние точки
+x1 <- x[index_min]
+y1 <- y[index_min]
+x2 <- x[index_max]
+y2 <- y[index_max]
+
+# Коэффициенты
+a_mnn <- (y2 - y1) / (x2 - x1)
+b_mnn <- y1 - a_mnn * x1
+
+# Формула итоговая МНН
+y_mnn <- a_mnn * x + b_mnn
+
+```
+
+### Построение линии регрессии с помощью методу наименьших квадратов
+```{r XY. Метод наименьших квадратов}
+
+lm_xy <- lm(y ~ x)
+
+# Коэффициенты
+a_mnk <- as.numeric(coef(lm_xy)["x"])
+b_mnk <- as.numeric(coef(lm_xy)["(Intercept)"])
+
+# Формула итоговая МНК
+y_mnk <- a_mnk * x + b_mnk
+```
+
+### Прогноз на 4 единицы вперёд
+```{r XY. Прогноз}
+
+x_max <- max(x)
+x_p <- x_max + 4
+
+y_p_mnn <- a_mnn * x_p + b_mnn
+y_p_mnk <- a_mnk * x_p + b_mnk
+
+```
+
+### Корреляционное поле и линии регрессии
+```{r XY. График линейной регрессии}
+
+df <- data.frame(x = x, y = y)
+
+x_line <- seq(min(x), max(x), length.out = 100)
+lines <- data.frame(
+  x = x_line,
+  y_mnn = a_mnn * x_line + b_mnn,
+  y_mnk = a_mnk * x_line + b_mnk
+)
+
+p_mnn <- data.frame(x = x_p, y = y_p_mnn)
+p_mnk <- data.frame(x = x_p, y = y_p_mnk)
+
+ggplot() +
+  geom_line(data = lines, aes(x = x, y = y_mnn), color = "darkorange", size = 1) +
+  annotate("label", x = 2.0, y = 1.5, label = "МНН", color = "darkorange") +
+  geom_line(data = lines, aes(x = x, y = y_mnk), color = "darkblue", size = 1) +
+  annotate("label", x = 2.0, y = 1.0, label = "МНК", color = "darkblue") +
+  geom_point(data = df, aes(x = x, y = y), color = "gray50") +
+  geom_point(data = p_mnn, aes(x = x, y = y), shape = 17,
+             color = "darkorange", size = 5) +
+  geom_point(data = p_mnk, aes(x = x, y = y), shape = 17,
+             color = "darkblue", size = 5) +
+  labs(title = "Корреляционое поле и линии регрессии для набора XY",
+       subtitle = paste0("y(МНН) = ", round(a_mnn, 4), "x + ", round(b_mnn, 4), " | y(МНК) = ", round(a_mnk, 4), "x + ", round(b_mnk, 4), "\n Прогноз при x = 10: y(МНН) = ", round(y_p_mnn, 2), " | y(МНК) = ", round(y_p_mnk, 2)),
+       x = "X",
+       y = "Y") +
+  theme_minimal()
+```
+
+### Проверка гипотезы о значимости коэффициента корреляции
+```{r XY. Проверка гипотезы о значимости коэффициента корреляции}
+
+alpha <- 0.05
+t_nabl <- r_xy * sqrt(n - 2) / sqrt(1 - r_xy^2)
+t_crit <- qt(1 - alpha/2, n - 2)
+
+cat("Коэффициент корреляции r_xy =", round(r_xy, 4), "\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("T_набл =", round(t_nabl, 4), "\n")
+cat("t_крит = +/-", round(t_crit, 4), "\n")
+
+if (abs(t_nabl) > t_crit) {
+  cat("|T_набл| > t_крит => H0 отвергается\n")
+  cat("Вывод: коэффициент корреляции значим\n")
+} else {
+  cat("|T_набл| < t_крит => H0 не отвергается\n")
+  cat("Вывод: коэффициент корреляции не значим\n")
+}
+
+df <- n - 2
+x_t <- seq(-4, 4, length.out = 1000)
+y_t <- dt(x_t, df = df)
+df_t <- data.frame(x = x_t, y = y_t)
+
+df_t_fill_1 <- df_t[df_t$x <= -t_crit, ]
+df_t_fill_2 <- df_t[df_t$x >= t_crit, ]
+
+ggplot() +
+  geom_area(data = df_t_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_t_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+   geom_line(data = df_t, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(-t_crit, t_crit),
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = t_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = -t_crit, y = -0.02,
+           label = paste("t1(крит) =", round(-t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_crit, y = -0.02,
+           label = paste("t2(крит) =", round(t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_nabl, y = 0.02,
+           label = paste("T(набл) =", round(t_nabl, 3)), color = "darkgreen") +
+  labs(title = "Проверка гипотезы о значимости коэффициента корреляции",
+       subtitle = "XY | t-распределение | Уровень значимости 0,05",,
+       x = "t-статистика", y = "Плотность") +
+  theme_minimal()
+
+```
+
+## Набор XZ
+### Построение линии регрессии с помощью метода натянутой нити
+```{r XZ. Метод натянутой нити}
+
+n <- length(x)
+
+# Индексы min и max по X
+index_min <- which.min(x)
+index_max <- which.max(x)
+
+# Крайние точки
+x1 <- x[index_min]
+y1 <- z[index_min]
+x2 <- x[index_max]
+y2 <- z[index_max]
+
+# Коэффициенты
+a_mnn <- (y2 - y1) / (x2 - x1)
+b_mnn <- y1 - a_mnn * x1
+
+# Формула итоговая МНН
+y_mnn <- a_mnn * x + b_mnn
+
+```
+
+### Построение линии регрессии с помощью методу наименьших квадратов
+```{r XZ. Метод наименьших квадратов}
+
+lm_xy <- lm(z ~ x)
+
+# Коэффициенты
+a_mnk <- as.numeric(coef(lm_xy)["x"])
+b_mnk <- as.numeric(coef(lm_xy)["(Intercept)"])
+
+# Формула итоговая МНК
+y_mnk <- a_mnk * x + b_mnk
+```
+
+### Прогноз на 4 единицы вперёд
+```{r XZ.Прогноз}
+
+x_max <- max(x)
+x_p <- x_max + 4
+
+y_p_mnn <- a_mnn * x_p + b_mnn
+y_p_mnk <- a_mnk * x_p + b_mnk
+
+```
+
+### Корреляционное поле и линии регрессии
+```{r XZ. График линейной регрессии}
+
+df <- data.frame(x = x, y = z)
+
+x_line <- seq(min(x), max(x), length.out = 100)
+lines <- data.frame(
+  x = x_line,
+  y_mnn = a_mnn * x_line + b_mnn,
+  y_mnk = a_mnk * x_line + b_mnk
+)
+
+p_mnn <- data.frame(x = x_p, y = y_p_mnn)
+p_mnk <- data.frame(x = x_p, y = y_p_mnk)
+
+ggplot() +
+  geom_line(data = lines, aes(x = x, y = y_mnn), color = "darkorange", size = 1) +
+  annotate("label", x = 1.0, y = 1.5, label = "МНН", color = "darkorange") +
+  geom_line(data = lines, aes(x = x, y = y_mnk), color = "darkblue", size = 1) +
+  annotate("label", x = 2.0, y = 2.2, label = "МНК", color = "darkblue") +
+  geom_point(data = df, aes(x = x, y = y), color = "gray50") +
+  geom_point(data = p_mnn, aes(x = x, y = y), shape = 17,
+             color = "darkorange", size = 5) +
+  geom_point(data = p_mnk, aes(x = x, y = y), shape = 17,
+             color = "darkblue", size = 5) +
+  labs(title = "Корреляционое поле и линии регрессии для набора XZ",
+       subtitle = paste0("z(МНН) = ", round(a_mnn, 4), "x + ", round(b_mnn, 4), " | z(МНК) = ", round(a_mnk, 4), "x + ", round(b_mnk, 4), "\n Прогноз при x = 10: z(МНН) = ", round(y_p_mnn, 2), " | z(МНК) = ", round(y_p_mnk, 2)),
+       x = "X",
+       y = "Z") +
+  theme_minimal()
+```
+
+### Проверка гипотезы о значимости коэффициента корреляции
+```{r XZ. Проверка гипотезы о значимости коэффициента корреляции}
+
+alpha <- 0.05
+t_nabl <- r_xz * sqrt(n - 2) / sqrt(1 - r_xz^2)
+t_crit <- qt(1 - alpha/2, n - 2)
+
+cat("Коэффициент корреляции r_xz =", round(r_xz, 4), "\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("T_набл =", round(t_nabl, 4), "\n")
+cat("t_крит = +/-", round(t_crit, 4), "\n")
+
+if (abs(t_nabl) > t_crit) {
+  cat("|T_набл| > t_крит => H0 отвергается\n")
+  cat("Вывод: коэффициент корреляции значим\n")
+} else {
+  cat("|T_набл| < t_крит => H0 не отвергается\n")
+  cat("Вывод: коэффициент корреляции не значим\n")
+}
+
+df <- n - 2
+x_t <- seq(-4, 4, length.out = 1000)
+y_t <- dt(x_t, df = df)
+df_t <- data.frame(x = x_t, y = y_t)
+
+df_t_fill_1 <- df_t[df_t$x <= -t_crit, ]
+df_t_fill_2 <- df_t[df_t$x >= t_crit, ]
+
+ggplot() +
+  geom_area(data = df_t_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_t_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_t, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(-t_crit, t_crit),
+             color = "darkred", size = 1, linetype = "dashed") +
+  geom_vline(xintercept = t_nabl,
+             color = "darkgreen", size = 1, linetype = "dotdash") +
+  annotate("label", x = -t_crit, y = -0.02,
+           label = paste("t1(крит) =", round(-t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_crit, y = -0.02,
+           label = paste("t2(крит) =", round(t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_nabl, y = 0.02,
+           label = paste("T(набл) =", round(t_nabl, 3)), color = "darkgreen") +
+  labs(title = "Проверка гипотезы о значимости коэффициента корреляции",
+       subtitle = "XZ | t-распределение | Уровень значимости 0,05",,
+       x = "t-статистика", y = "Плотность") +
+  theme_minimal()
+```
+
+## Набор YZ
+### Построение линии регрессии с помощью метода натянутой нити
+```{r YZ. Метод натянутой нити}
+
+n <- length(y)
+
+# Индексы min и max по Y
+index_min <- which.min(y)
+index_max <- which.max(y)
+
+# Крайние точки
+x1 <- y[index_min]
+y1 <- z[index_min]
+x2 <- y[index_max]
+y2 <- z[index_max]
+
+# Коэффициенты
+a_mnn <- (y2 - y1) / (x2 - x1)
+b_mnn <- y1 - a_mnn * x1
+
+# Формула итоговая МНН
+y_mnn <- a_mnn * x + b_mnn
+
+```
+
+### Построение линии регрессии с помощью методу наименьших квадратов
+```{r YZ. Метод наименьших квадратов}
+
+lm_xy <- lm(z ~ y)
+
+# Коэффициенты
+a_mnk <- as.numeric(coef(lm_xy)["y"])
+b_mnk <- as.numeric(coef(lm_xy)["(Intercept)"])
+
+# Формула итоговая МНК
+y_mnk <- a_mnk * x + b_mnk
+```
+
+### Корреляционное поле и линии регрессии
+```{r YZ. График линейной регрессии}
+
+df <- data.frame(x = y, y = z)
+
+x_line <- seq(min(y), max(y), length.out = 100)
+lines <- data.frame(
+  x = x_line,
+  y_mnn = a_mnn * x_line + b_mnn,
+  y_mnk = a_mnk * x_line + b_mnk
+)
+
+ggplot() +
+  geom_line(data = lines, aes(x = x, y = y_mnn), color = "darkorange", size = 1) +
+  annotate("label", x = 2.0, y = 3.2, label = "МНН", color = "darkorange") +
+  geom_line(data = lines, aes(x = x, y = y_mnk), color = "darkblue", size = 1) +
+  annotate("label", x = 1.0, y = 2.3, label = "МНК", color = "darkblue") +
+  geom_point(data = df, aes(x = x, y = y), color = "gray50") +
+  labs(title = "Корреляционое поле и линии регрессии для набора YZ",
+       subtitle = paste0("z(МНН) = ", round(a_mnn, 4), "x + ", round(b_mnn, 4), " | z(МНК) = ", round(a_mnk, 4), "x + ", round(b_mnk, 4)),
+       x = "Y",
+       y = "Z") +
+  theme_minimal()
+```
+
+### Проверка гипотезы о значимости коэффициента корреляции
+```{r YZ. Проверка гипотезы о значимости коэффициента корреляции}
+
+alpha <- 0.05
+t_nabl <- r_yz * sqrt(n - 2) / sqrt(1 - r_yz^2)
+t_crit <- qt(1 - alpha/2, n - 2)
+
+cat("Коэффициент корреляции r_yz =", round(r_yz, 4), "\n")
+
+cat("Уровень значимости:", alpha, "\n")
+
+cat("T_набл =", round(t_nabl, 4), "\n")
+cat("t_крит = +/-", round(t_crit, 4), "\n")
+
+if (abs(t_nabl) > t_crit) {
+  cat("|T_набл| > t_крит => H0 отвергается\n")
+  cat("Вывод: коэффициент корреляции значим\n")
+} else {
+  cat("|T_набл| < t_крит => H0 не отвергается\n")
+  cat("Вывод: коэффициент корреляции не значим\n")
+}
+
+df <- n - 2
+x_t <- seq(-4, 4, length.out = 1000)
+y_t <- dt(x_t, df = df)
+df_t <- data.frame(x = x_t, y = y_t)
+
+df_t_fill_1 <- df_t[df_t$x <= -t_crit, ]
+df_t_fill_2 <- df_t[df_t$x >= t_crit, ]
+
+ggplot() +
+  geom_area(data = df_t_fill_1, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_area(data = df_t_fill_2, aes(x = x, y = y), fill = "salmon", alpha = 0.7) +
+  geom_line(data = df_t, aes(x = x, y = y), size = 1) +
+  geom_vline(xintercept = c(-t_crit, t_crit),
+             color = "darkred", linetype = "dashed", size = 1) +
+  geom_vline(xintercept = t_nabl,
+             color = "darkgreen", linetype = "dotdash", size = 1) +
+  annotate("label", x = -t_crit, y = -0.02,
+           label = paste("t1(крит) =", round(-t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_crit, y = -0.02,
+           label = paste("t2(крит) =", round(t_crit, 3)), color = "darkred") +
+  annotate("label", x = t_nabl, y = -0.06,
+           label = paste("T(набл) =", round(t_nabl, 3)), color = "darkgreen") +
+  labs(title = "Проверка гипотезы о значимости коэффициента корреляции",
+       subtitle = "YZ | t-распределение | Уровень значимости 0,05",,
+       x = "t-статистика", y = "Плотность") +
+  theme_minimal()
+
+
+```
+
+
+
+
+
+
